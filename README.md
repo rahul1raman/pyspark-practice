@@ -2,11 +2,18 @@
 
 Clone the repo and then follow the commands below
 
-## Spark setup (k8s required)
+## Spark setup (k8s and docker required)
 ```bash
-kubectl apply -f deployments/spark-jupyter-standalone.yaml
+./dev prepare
+./dev install
 ```
 
+## To reset local minio
+```bash
+./dev reset-minio
+```
+
+## Misc
 kubectl get pods
 kubectl logs <pod-name>
 
@@ -14,12 +21,8 @@ kubectl logs <pod-name>
 ```bash
 pip install -r src/requirements.txt
 ```
-##  
 
-## Port forward to see spark UI
-```bash
- kubectl port-forward service/spark-jupyter-service 7077:7077 8080:8080 4040:4040 8888:8888
-```
-Spark UI: localhost:8080
-Spark Plan: localhost:4040
-Jupyter: localhost:8888
+## Web URLs
+- Minio: http://localhost:30002
+- Spark Master: http://localhost:30080/
+- Jupyter Notebook: http://localhost:30888

@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-reset-job
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: minio-reset
+        image: minio/mc
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Waiting for MinIO to be ready..."
+            until mc alias set local http://minio-service:9000 fakesecret fakesecret; do
+              echo "MinIO not ready, retrying..."
+              sleep 2
+            done
+            echo "MinIO Ready!"
+
+            # Delete all existing buckets
+            buckets=$(mc ls local | awk '{print $5}')
+            for bucket in $buckets; do
+              echo "Removing bucket: $bucket"
+              mc rm -r --force local/$bucket
+            done
+
+            echo "Creating single bucket..."
+            mc mb -p local/local-datalake
+
+            echo "Creating folder with dummy files..."
+            touch dummyfile
+            mc cp dummyfile local/local-datalake/warehouse/dummyfile
+            echo "Datalake folder structure created!"

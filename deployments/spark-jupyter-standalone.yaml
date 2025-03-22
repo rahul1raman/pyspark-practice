@@ -17,34 +17,24 @@ spec:
       securityContext:
         runAsUser: 0
       containers:
-      - name: spark-standalone
-        image: apache/spark-py:latest
+      - name: spark-jupyter
+        image: spark-jupyter-iceberg:latest
+        imagePullPolicy: Never
         ports:
-        - containerPort: 7077
-        - containerPort: 8080
-        - containerPort: 4040
-        command: ["/bin/sh", "-c"]
-        args:
-          - |
-            mkdir -p /opt/spark/logs && \
-            chmod 777 /opt/spark/logs && \
-            /opt/spark/sbin/start-master.sh && \
-            /opt/spark/sbin/start-worker.sh spark://localhost:7077 && \
-            tail -f /dev/null
-        volumeMounts:
-        - name: local-work
-          mountPath: /opt/spark/workdir
-      - name: jupyter
-        image: jupyter/pyspark-notebook:latest
-        ports:
-        - containerPort: 8888
+          - containerPort: 7077   # Spark Master
+          - containerPort: 8080   # Spark Master UI
+          - containerPort: 4040   # Spark App UI
+          - containerPort: 8888   # Jupyter Notebook
         volumeMounts:
         - name: local-work
           mountPath: /home/jovyan/work
         args:
-        - start-notebook.sh
-        - --NotebookApp.token=''
-        - --NotebookApp.password=''
+        - /bin/sh
+        - -c
+        - |
+          /usr/local/spark/sbin/start-master.sh && \
+          /usr/local/spark/sbin/start-worker.sh spark://localhost:7077 && \
+          start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
       volumes:
       - name: local-work
         hostPath:
@@ -63,16 +53,20 @@ spec:
       protocol: TCP
       port: 7077
       targetPort: 7077
+      nodePort: 30077
     - name: ui
       protocol: TCP
       port: 8080
       targetPort: 8080
+      nodePort: 30080
     - name: app-ui
       protocol: TCP
       port: 4040
       targetPort: 4040
+      nodePort: 30440
     - name: jupyter
       protocol: TCP
       port: 8888
       targetPort: 8888
+      nodePort: 30888
   type: NodePort
