@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-jupyter-combined
+  labels:
+    app: spark-jupyter-combined
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-jupyter-combined
+  template:
+    metadata:
+      labels:
+        app: spark-jupyter-combined
+    spec:
+      securityContext:
+        runAsUser: 0
+      containers:
+      - name: spark-standalone
+        image: apache/spark-py:latest
+        ports:
+        - containerPort: 7077
+        - containerPort: 8080
+        - containerPort: 4040
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            mkdir -p /opt/spark/logs && \
+            chmod 777 /opt/spark/logs && \
+            /opt/spark/sbin/start-master.sh && \
+            /opt/spark/sbin/start-worker.sh spark://localhost:7077 && \
+            tail -f /dev/null
+        volumeMounts:
+        - name: local-work
+          mountPath: /opt/spark/workdir
+      - name: jupyter
+        image: jupyter/pyspark-notebook:latest
+        ports:
+        - containerPort: 8888
+        volumeMounts:
+        - name: local-work
+          mountPath: /home/jovyan/work
+        args:
+        - start-notebook.sh
+        - --NotebookApp.token=''
+        - --NotebookApp.password=''
+      volumes:
+      - name: local-work
+        hostPath:
+          path: "/mnt/e/learn/pyspark-practice"
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-jupyter-service
+spec:
+  selector:
+    app: spark-jupyter-combined
+  ports:
+    - name: master
+      protocol: TCP
+      port: 7077
+      targetPort: 7077
+    - name: ui
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+    - name: app-ui
+      protocol: TCP
+      port: 4040
+      targetPort: 4040
+    - name: jupyter
+      protocol: TCP
+      port: 8888
+      targetPort: 8888
+  type: NodePort
