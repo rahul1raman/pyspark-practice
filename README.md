@@ -13,6 +13,11 @@ Clone the repo and then follow the commands below
 ./dev reset-minio
 ```
 
+## Download test data
+This copies donation data to local-datalake/raw
+```bash
+./downloadToMinio.sh
+```
 ## Misc
 kubectl get pods
 kubectl logs <pod-name>
