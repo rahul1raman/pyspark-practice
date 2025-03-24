@@ -1,2 +1,4 @@
 jars/*
 downloads/*
+src/notebooks/.ipynb_checkpoints/*'
+src/notebooks/spark-warehouse
