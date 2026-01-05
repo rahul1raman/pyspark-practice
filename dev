@@ -1,157 +1,143 @@
 #!/bin/bash
 set -e
-# Color codes
+
+# ─────────────────────────────────────────────────────────────
+# Colors & helpers
+# ─────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
-# Print success/info message
+NC='\033[0m'
+
 info() {
     echo -e "${GREEN}== $1 ==${NC}"
 }
-# Print error message
+
 error() {
     echo -e "${RED}== $1 ==${NC}"
 }
-# Versions
-HADOOP_VERSION=3.3.4
-AWS_SDK_BUNDLE_VERSION=1.11.1026
-ICEBERG_VERSION=1.4.2
+
+# ─────────────────────────────────────────────────────────────
+# Versions (LOCK THESE)
+# ─────────────────────────────────────────────────────────────
 SPARK_SCALA_VERSION=2.12
+SPARK_MAJOR_VERSION=3.5
+ICEBERG_VERSION=1.4.2
+AWS_SDK_BUNDLE_VERSION=1.11.1026
 
-# Function to download Hadoop distribution
-download_hadoop() {
-    info "Downloading Hadoop distribution..."
-    DOWNLOAD_DIR="./downloads"
-    mkdir -p $DOWNLOAD_DIR
-    
-    HADOOP_DIST_URL="https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz"
-    HADOOP_TAR_PATH="${DOWNLOAD_DIR}/hadoop-${HADOOP_VERSION}.tar.gz"
-    
-    if [ ! -f "$HADOOP_TAR_PATH" ]; then
-        info "Downloading Hadoop ${HADOOP_VERSION} distribution..."
-        wget -c -O "$HADOOP_TAR_PATH" "$HADOOP_DIST_URL" || { error "Failed to download Hadoop distribution"; exit 1; }
-    else
-        info "Hadoop distribution archive already exists, skipping download."
-    fi
-    
-    info "Hadoop distribution downloaded to ${HADOOP_TAR_PATH}"
-}
+DOWNLOAD_DIR="./downloads"
 
-# Function to download Iceberg JAR
+# ─────────────────────────────────────────────────────────────
+# Downloads
+# ─────────────────────────────────────────────────────────────
+
 download_iceberg() {
-    info "Downloading Iceberg JAR..."
-    DOWNLOAD_DIR="./downloads"
-    mkdir -p $DOWNLOAD_DIR
-    
-    ICEBERG_JAR_URL="https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.4_${SPARK_SCALA_VERSION}/${ICEBERG_VERSION}/iceberg-spark-runtime-3.4_${SPARK_SCALA_VERSION}-${ICEBERG_VERSION}.jar"
-    ICEBERG_JAR_PATH="${DOWNLOAD_DIR}/iceberg-spark-runtime-3.4_${SPARK_SCALA_VERSION}-${ICEBERG_VERSION}.jar"
-    
-    if [ ! -f "$ICEBERG_JAR_PATH" ]; then
-        info "Downloading Iceberg JAR..."
-        wget -c -O "$ICEBERG_JAR_PATH" "$ICEBERG_JAR_URL" || { error "Failed to download Iceberg JAR"; exit 1; }
+    info "Downloading Iceberg Spark runtime..."
+
+    mkdir -p "${DOWNLOAD_DIR}"
+
+    ICEBERG_JAR="iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_${SPARK_SCALA_VERSION}-${ICEBERG_VERSION}.jar"
+    ICEBERG_URL="https://repo1.maven.org/maven2/org/apache/iceberg/${ICEBERG_JAR%.*}/${ICEBERG_VERSION}/${ICEBERG_JAR}"
+    ICEBERG_PATH="${DOWNLOAD_DIR}/${ICEBERG_JAR}"
+
+    if [ ! -f "${ICEBERG_PATH}" ]; then
+        wget -O "${ICEBERG_PATH}" "${ICEBERG_URL}" || {
+            error "Failed to download Iceberg runtime JAR"
+            exit 1
+        }
     else
-        info "Iceberg JAR already exists, skipping download."
+        info "Iceberg JAR already present, skipping"
     fi
-    
-    info "Iceberg JAR downloaded to ${ICEBERG_JAR_PATH}"
 }
 
-# Function to download AWS SDK Bundle
 download_aws_sdk_bundle() {
-    info "Downloading AWS SDK Bundle..."
-    DOWNLOAD_DIR="./downloads"
-    mkdir -p $DOWNLOAD_DIR
-    
-    AWS_SDK_URL="https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_BUNDLE_VERSION}/aws-java-sdk-bundle-${AWS_SDK_BUNDLE_VERSION}.jar"
-    AWS_SDK_PATH="${DOWNLOAD_DIR}/aws-java-sdk-bundle-${AWS_SDK_BUNDLE_VERSION}.jar"
-    
-    if [ ! -f "$AWS_SDK_PATH" ]; then
-        info "Downloading AWS SDK Bundle ${AWS_SDK_BUNDLE_VERSION}..."
-        wget -c -O "$AWS_SDK_PATH" "$AWS_SDK_URL" || { error "Failed to download AWS SDK Bundle"; exit 1; }
+    info "Downloading AWS SDK bundle..."
+
+    mkdir -p "${DOWNLOAD_DIR}"
+
+    AWS_JAR="aws-java-sdk-bundle-${AWS_SDK_BUNDLE_VERSION}.jar"
+    AWS_URL="https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_BUNDLE_VERSION}/${AWS_JAR}"
+    AWS_PATH="${DOWNLOAD_DIR}/${AWS_JAR}"
+
+    if [ ! -f "${AWS_PATH}" ]; then
+        wget -O "${AWS_PATH}" "${AWS_URL}" || {
+            error "Failed to download AWS SDK bundle"
+            exit 1
+        }
     else
-        info "AWS SDK Bundle already exists, skipping download."
+        info "AWS SDK bundle already present, skipping"
     fi
-    
-    info "AWS SDK Bundle downloaded to ${AWS_SDK_PATH}"
 }
 
-# Function to install MinIO
+# ─────────────────────────────────────────────────────────────
+# MinIO
+# ─────────────────────────────────────────────────────────────
+
 install_minio() {
-    info "Applying MinIO deployment..."
+    info "Deploying MinIO..."
     kubectl apply -f deployments/minio-deployment.yaml
-    info "Waiting for MinIO pod to be ready..."
-    if ! kubectl wait --for=condition=ready pod -l app=minio --timeout=120s; then
-        error "MinIO pod failed to become ready!"
-        exit 1
-    fi
-    info "MinIO is deployed and ready."
+
+    info "Waiting for MinIO to be ready..."
+    kubectl wait \
+        --for=condition=ready pod \
+        -l app=minio \
+        --timeout=120s
 }
 
-# Function to build Docker image
-build_docker_image() {
-    info "Building Docker image for Spark-Jupyter-Iceberg..."
-    docker build -t spark-jupyter-iceberg:latest . || { error "Docker build failed!"; exit 1; }
-    info "Docker image built successfully."
-}
-
-# Function to deploy Spark-Jupyter-Iceberg pod
-deploy_spark_jupyter_iceberg() {
-    info "Applying Spark-Jupyter-Iceberg deployment..."
-    kubectl apply -f deployments/spark-jupyter-standalone.yaml
-    info "Waiting for Spark-Jupyter-Iceberg pod to be ready..."
-    if ! kubectl wait --for=condition=ready pod -l app=spark-jupyter-combined --timeout=120s; then
-        error "Spark-Jupyter-Iceberg pod failed to become ready!"
-        exit 1
-    fi
-    info "Spark-Jupyter-Iceberg is deployed and ready."
-}
-
-# Function to reset MinIO
 reset_minio() {
-    info "Applying MinIO reset job..."
+    info "Resetting MinIO..."
     kubectl apply -f deployments/minio-reset-job.yaml
-    info "Waiting for MinIO reset job to complete..."
-    if ! kubectl wait --for=condition=complete job/minio-reset-job --timeout=120s; then
-        error "MinIO reset job failed!"
-        exit 1
-    fi
-    info "MinIO has been reset."
+
+    kubectl wait \
+        --for=condition=complete \
+        job/minio-reset-job \
+        --timeout=120s
 }
 
-# Main script logic
+# ─────────────────────────────────────────────────────────────
+# Spark / Jupyter
+# ─────────────────────────────────────────────────────────────
+
+build_docker_image() {
+    info "Building Spark + Jupyter + Iceberg image..."
+    docker build --no-cache -t spark-jupyter-iceberg:latest .
+}
+
+deploy_spark() {
+    info "Deploying Spark Jupyter stack..."
+    kubectl apply -f deployments/spark-jupyter-standalone.yaml
+
+    info "Waiting for Spark pod to be ready..."
+    kubectl wait \
+        --for=condition=ready pod \
+        -l app=spark-jupyter-combined \
+        --timeout=120s
+}
+
+# ─────────────────────────────────────────────────────────────
+# Entry point
+# ─────────────────────────────────────────────────────────────
+
 case "$1" in
     download)
-        download_hadoop
         download_iceberg
         download_aws_sdk_bundle
-        ;;
-    prepare)
-        download_hadoop
-        download_iceberg
-        download_aws_sdk_bundle
-        info "Downloads complete. Ready to build and deploy."
         ;;
     install)
-        # Check if downloads exist, if not, download them
-        if [ ! -d "downloads" ] || [ ! "$(ls -A downloads 2>/dev/null)" ]; then
-            info "Downloads not found, downloading first..."
-            download_hadoop
-            download_iceberg
-            download_aws_sdk_bundle
-        fi
+        download_iceberg
+        download_aws_sdk_bundle
         install_minio
         build_docker_image
-        deploy_spark_jupyter_iceberg
+        deploy_spark
         ;;
     reset-minio)
         reset_minio
         ;;
     *)
-        error "Usage: $0 {download|prepare|install|reset-minio}"
-        echo "  download     - Download Hadoop distribution, Iceberg JAR, and AWS SDK Bundle"
-        echo "  prepare      - Download dependencies for faster builds"
-        echo "  install      - Download dependencies if needed and deploy the entire stack"
-        echo "  reset-minio  - Reset the MinIO storage"
+        error "Usage: $0 {download|install|reset-minio}"
+        echo
+        echo "  download     Download Iceberg + AWS SDK jars"
+        echo "  install      Build image and deploy full stack"
+        echo "  reset-minio  Wipe MinIO warehouse data"
         exit 1
         ;;
 esac

@@ -1,3 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spark-work-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,6 +36,13 @@ spec:
           - containerPort: 8080   # Spark Master UI
           - containerPort: 4040   # Spark App UI
           - containerPort: 8888   # Jupyter Notebook
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            value: fakesecret
+          - name: AWS_SECRET_ACCESS_KEY
+            value: fakesecret
+          - name: AWS_REGION
+            value: us-east-1
         volumeMounts:
         - name: local-work
           mountPath: /home/jovyan/work
@@ -37,9 +55,8 @@ spec:
           start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
       volumes:
       - name: local-work
-        hostPath:
-          path: "/mnt/e/learn/pyspark-practice"
-          type: Directory
+        persistentVolumeClaim:
+          claimName: spark-work-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -48,6 +65,7 @@ metadata:
 spec:
   selector:
     app: spark-jupyter-combined
+  type: NodePort
   ports:
     - name: master
       protocol: TCP
@@ -69,4 +87,3 @@ spec:
       port: 8888
       targetPort: 8888
       nodePort: 30888
-  type: NodePort

@@ -2,12 +2,14 @@
 
 Clone the repo and then follow the commands below
 
+## Install Minio
+https://github.com/minio/mc
+
 ## Spark setup (k8s and docker required)
 ```bash
-./dev prepare
 ./dev install
 ```
-
+ 
 ## To reset local minio
 ```bash
 ./dev reset-minio
