@@ -30,13 +30,13 @@ DOWNLOAD_DIR="./downloads"
 # Downloads
 # ─────────────────────────────────────────────────────────────
 
-download_iceberg() {
+download_iceberg() {    
     info "Downloading Iceberg Spark runtime..."
 
     mkdir -p "${DOWNLOAD_DIR}"
 
     ICEBERG_JAR="iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_${SPARK_SCALA_VERSION}-${ICEBERG_VERSION}.jar"
-    ICEBERG_URL="https://repo1.maven.org/maven2/org/apache/iceberg/${ICEBERG_JAR%.*}/${ICEBERG_VERSION}/${ICEBERG_JAR}"
+    ICEBERG_URL="https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_${SPARK_SCALA_VERSION}/${ICEBERG_VERSION}/iceberg-spark-runtime-${SPARK_MAJOR_VERSION}_${SPARK_SCALA_VERSION}-${ICEBERG_VERSION}.jar"
     ICEBERG_PATH="${DOWNLOAD_DIR}/${ICEBERG_JAR}"
 
     if [ ! -f "${ICEBERG_PATH}" ]; then
