@@ -1,5 +1,24 @@
 #!/bin/bash
 
+# Ensure mc client is installed
+if ! command -v mc &> /dev/null; then
+    if [ -f "$HOME/.local/bin/mc" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        echo "MinIO Client (mc) not found in PATH. Attempting to download..."
+        mkdir -p "$HOME/.local/bin"
+        if curl -L -o "$HOME/.local/bin/mc" https://dl.min.io/client/mc/release/linux-amd64/mc; then
+            chmod +x "$HOME/.local/bin/mc"
+            export PATH="$HOME/.local/bin:$PATH"
+            echo "MinIO Client (mc) installed successfully to $HOME/.local/bin."
+        else
+            echo "Error: MinIO Client (mc) is required but not installed."
+            echo "Please install it manually: https://github.com/minio/mc"
+            exit 1
+        fi
+    fi
+fi
+
 # Create temp directory
 TEMP_DIR=$(mktemp -d)
 cd $TEMP_DIR

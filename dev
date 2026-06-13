@@ -99,7 +99,7 @@ reset_minio() {
 
 build_docker_image() {
     info "Building Spark + Jupyter + Iceberg image..."
-    docker build --no-cache -t spark-jupyter-iceberg:latest .
+    docker build -t spark-jupyter-iceberg:latest .
 }
 
 deploy_spark() {
